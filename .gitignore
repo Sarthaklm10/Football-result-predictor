@@ -1,0 +1,47 @@
+# ============================================
+# Football Match Predictor — .gitignore
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data (processed only — raw CSVs are small enough to track)
+data/processed/*.csv
+
+# Trained Models (large binary files)
+models/*.joblib
+models/*.pkl
+
+# Reports (generated outputs)
+reports/*.html
+reports/*.png
+
+# Environment variables
+.env
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
