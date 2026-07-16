@@ -12,7 +12,9 @@ All plots are saved to reports/ folder.
 # ── Imports ──────────────────────────────────────────────────
 import pandas as pd
 import numpy as np
+# pyrefly: ignore [missing-import]
 import matplotlib.pyplot as plt
+# pyrefly: ignore [missing-import]
 import matplotlib.ticker as ticker
 import seaborn as sns
 from pathlib import Path
@@ -29,7 +31,7 @@ plt.rcParams.update({
     'savefig.dpi': 150,
 })
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent if '__file__' in dir() else Path('.')
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_PATH = PROJECT_ROOT / 'data' / 'raw' / 'results.csv'
 REPORTS_DIR = PROJECT_ROOT / 'reports'
 REPORTS_DIR.mkdir(exist_ok=True)
@@ -78,7 +80,7 @@ ax.set_xlabel('Column')
 plt.xticks(rotation=45, ha='right')
 plt.savefig(REPORTS_DIR / '01_missing_values.png')
 plt.close()
-print(f"  -> Only {null_counts.sum()} total nulls across {len(df):,} rows (negligible)")
+print(f"  → Only {null_counts.sum()} total nulls across {len(df):,} rows (negligible)")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -109,7 +111,7 @@ plt.suptitle('Target Variable Analysis', fontsize=16, fontweight='bold', y=1.02)
 plt.tight_layout()
 plt.savefig(REPORTS_DIR / '02_target_distribution.png')
 plt.close()
-print(f"  -> Home Win: {result_counts.get('Home Win',0)/len(df)*100:.1f}%, "
+print(f"  → Home Win: {result_counts.get('Home Win',0)/len(df)*100:.1f}%, "
       f"Away Win: {result_counts.get('Away Win',0)/len(df)*100:.1f}%, "
       f"Draw: {result_counts.get('Draw',0)/len(df)*100:.1f}%")
 
@@ -129,13 +131,13 @@ year_counts = df.groupby('year').size()
 ax.fill_between(year_counts.index, year_counts.values, alpha=0.3, color='#3498db')
 ax.plot(year_counts.index, year_counts.values, color='#2c3e50', linewidth=1.5)
 ax.axvline(x=2000, color='#e74c3c', linestyle='--', alpha=0.7, label='Year 2000')
-ax.set_title('International Matches Per Year (1872-2026)', fontsize=14, fontweight='bold')
+ax.set_title('International Matches Per Year (1872–2026)', fontsize=14, fontweight='bold')
 ax.set_xlabel('Year')
 ax.set_ylabel('Number of Matches')
 ax.legend(fontsize=11)
 plt.savefig(REPORTS_DIR / '03_matches_per_year.png')
 plt.close()
-print(f"  -> Peak year: {year_counts.idxmax()} ({year_counts.max()} matches)")
+print(f"  → Peak year: {year_counts.idxmax()} ({year_counts.max()} matches)")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -228,7 +230,7 @@ axes[1].set_xlim(-0.5, 15)
 plt.tight_layout()
 plt.savefig(REPORTS_DIR / '06_goals_distribution.png')
 plt.close()
-print(f"  -> Avg total goals per match: {df['total_goals'].mean():.2f}")
+print(f"  → Avg total goals per match: {df['total_goals'].mean():.2f}")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -277,7 +279,7 @@ ax.set_title('Top 12 Tournament Types', fontsize=14, fontweight='bold')
 ax.set_xlabel('Number of Matches')
 plt.savefig(REPORTS_DIR / '08_tournament_distribution.png')
 plt.close()
-print(f"  -> Friendlies: {top_tournaments.iloc[0]:,} ({top_tournaments.iloc[0]/len(df)*100:.1f}%)")
+print(f"  → Friendlies: {top_tournaments.iloc[0]:,} ({top_tournaments.iloc[0]/len(df)*100:.1f}%)")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -310,8 +312,8 @@ plt.suptitle('Home Advantage: All vs Non-Neutral Venues', fontsize=15, fontweigh
 plt.tight_layout()
 plt.savefig(REPORTS_DIR / '09_home_advantage.png')
 plt.close()
-print(f"  -> Home win % (all): {all_results.get('Home Win',0)/len(df)*100:.1f}%")
-print(f"  -> Home win % (non-neutral): {nn_results.get('Home Win',0)/len(non_neutral)*100:.1f}%")
+print(f"  → Home win % (all): {all_results.get('Home Win',0)/len(df)*100:.1f}%")
+print(f"  → Home win % (non-neutral): {nn_results.get('Home Win',0)/len(non_neutral)*100:.1f}%")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -480,4 +482,6 @@ print(f"  8. 477 matches with 10+ total goals (outliers)")
 print(f"  9. Friendlies = 37% of all matches")
 print(f" 10. Peak year: {year_counts.idxmax()} ({year_counts.max()} matches)")
 
+# Cleanup temp
+import os
 year_counts = df.groupby('year').size()
