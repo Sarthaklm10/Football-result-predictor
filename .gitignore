@@ -41,6 +41,9 @@ reports/*.png
 # Environment variables
 .env
 
+# Guide (personal viva notes — not part of the project)
+guide/
+
 # Distribution / Packaging
 dist/
 build/
