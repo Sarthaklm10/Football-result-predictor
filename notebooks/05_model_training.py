@@ -1,21 +1,7 @@
 """
-===============================================================
-STEPS 9 & 10: Baseline Model + Train Multiple Models
-===============================================================
-International Football Match Outcome Predictor
-
-Step 9:  Train Logistic Regression as a baseline.
-Step 10: Train Decision Tree, Random Forest, XGBoost.
-         Compare all models using multiple metrics.
-
-WHY start with a simple baseline?
-  A baseline tells you: "Any decent model must beat THIS."
-  If your fancy XGBoost gets 48% accuracy and Logistic Regression
-  gets 47%, the fancy model isn't worth the complexity.
-
-  Our dummy baseline: always predict "Home Win" = 49% accuracy.
-  Our model must beat this to be useful.
-===============================================================
+Steps 9 & 10: Baseline Model + Train Multiple Models
+Trains LR, Decision Tree, Random Forest, XGBoost.
+Compares all using accuracy, precision, recall, F1, confusion matrix.
 """
 
 import pandas as pd
@@ -58,33 +44,7 @@ print(f"  Classes: {list(label_encoder.classes_)}")
 
 def evaluate_model(model, X_train, X_test, y_train, y_test,
                    model_name: str, label_encoder) -> dict:
-    """Train a model and evaluate it with multiple metrics.
-
-    Metrics explained with football examples:
-
-    ACCURACY: Out of all predictions, how many were correct?
-      "I predicted 100 matches. 55 were right." = 55% accuracy.
-
-    PRECISION: When I predicted "Home Win", how often was it actually a home win?
-      "I predicted Home Win 80 times. 60 were correct." = 75% precision.
-      High precision = few false alarms.
-
-    RECALL: Out of all actual Home Wins, how many did I catch?
-      "There were 100 actual Home Wins. I found 60." = 60% recall.
-      High recall = few missed cases.
-
-    F1 SCORE: Harmonic mean of precision and recall (balances both).
-      If precision=90% but recall=10%, F1 is low (model misses most cases).
-      F1 rewards models that are BOTH precise AND thorough.
-
-    CONFUSION MATRIX: A 3x3 grid showing exactly where the model
-      gets confused. Rows = actual class, Columns = predicted class.
-      Diagonal = correct predictions. Off-diagonal = mistakes.
-
-    We use 'macro' averaging: compute metric for each class separately,
-    then take the unweighted average. This gives equal importance to
-    all 3 classes, even though Home Win has more samples.
-    """
+    """Train, predict, and evaluate a model. Returns dict of metrics."""
     # Train
     model.fit(X_train, y_train)
 
@@ -133,27 +93,7 @@ def evaluate_model(model, X_train, X_test, y_train, y_test,
     }
 
 
-# ══════════════════════════════════════════════════════════════
-# STEP 9: Baseline — Logistic Regression
-# ══════════════════════════════════════════════════════════════
-# WHY Logistic Regression first?
-#   - Simplest multiclass classifier
-#   - Fast to train (seconds, not minutes)
-#   - Sets a meaningful baseline above "always predict Home Win"
-#   - If LR gets 55%, any complex model must beat 55% to justify
-#     its added complexity
-#
-# HOW it works (intuition):
-#   Logistic Regression draws linear boundaries between classes.
-#   It computes a weighted sum of features and passes it through
-#   a sigmoid/softmax function to get probabilities.
-#
-#   For multiclass, it uses "one-vs-rest": trains 3 separate
-#   binary classifiers (Home Win vs rest, Draw vs rest, Away Win
-#   vs rest) and picks the class with highest probability.
-#
-# ADVANTAGES: Fast, interpretable, good baseline
-# DISADVANTAGES: Assumes linear relationships (football is messy)
+# ── Baseline: Logistic Regression ────────────────────────────
 
 print("\n" + "#" * 60)
 print("# STEP 9: Baseline Model — Logistic Regression")
@@ -181,20 +121,12 @@ print("# STEP 10: Training Multiple Models")
 print("#" * 60)
 
 
-# ── Model 1: Decision Tree ──────────────────────────────────
-# HOW it works (intuition):
-#   Creates a flowchart of yes/no questions:
-#   "Is home_win_rate_last5 > 0.6? Yes -> more likely Home Win"
-#   "Is neutral == 1? Yes -> less likely Home Win"
-#   Each branch splits the data until it reaches a prediction.
-#
-# ADVANTAGES: Highly interpretable, handles non-linear patterns
-# DISADVANTAGES: Prone to overfitting (memorizes training data)
+# ── Decision Tree ────────────────────────────────────────────
 
 dt_model = DecisionTreeClassifier(
-    max_depth=10,           # Limit tree depth to prevent overfitting
-    min_samples_split=20,   # Need at least 20 samples to split
-    min_samples_leaf=10,    # Each leaf must have at least 10 samples
+    max_depth=10,           # Control overfitting
+    min_samples_split=20,   # Minimum samples for split
+    min_samples_leaf=10,    # Minimum samples per leaf
     random_state=42,
     class_weight='balanced'
 )
@@ -205,25 +137,16 @@ dt_results = evaluate_model(
 )
 
 
-# ── Model 2: Random Forest ──────────────────────────────────
-# HOW it works (intuition):
-#   Creates MANY decision trees (a "forest"), each trained on a
-#   random subset of data and features. Final prediction = majority
-#   vote of all trees. This reduces overfitting because individual
-#   tree mistakes get averaged out.
-#
-# ADVANTAGES: Handles non-linearity, resistant to overfitting,
-#             gives feature importance
-# DISADVANTAGES: Slower than single tree, less interpretable
+# ── Random Forest ────────────────────────────────────────────
 
 rf_model = RandomForestClassifier(
-    n_estimators=200,       # 200 trees in the forest
-    max_depth=15,           # Each tree can go 15 levels deep
+    n_estimators=200,       # Number of trees
+    max_depth=15,           # Tree depth limit
     min_samples_split=10,
     min_samples_leaf=5,
     random_state=42,
     class_weight='balanced',
-    n_jobs=-1               # Use all CPU cores for speed
+    n_jobs=-1
 )
 
 rf_results = evaluate_model(
@@ -232,24 +155,14 @@ rf_results = evaluate_model(
 )
 
 
-# ── Model 3: XGBoost ────────────────────────────────────────
-# HOW it works (intuition):
-#   Builds trees SEQUENTIALLY. Each new tree focuses on the
-#   mistakes of the previous trees. Tree 1 makes predictions.
-#   Tree 2 learns from Tree 1's errors. Tree 3 fixes Tree 2's
-#   remaining errors. And so on. This "boosting" process creates
-#   a very strong combined model.
-#
-# ADVANTAGES: Often the best for tabular data, handles imbalance,
-#             built-in regularization
-# DISADVANTAGES: More hyperparameters to tune, slower to train
+# ── XGBoost ──────────────────────────────────────────────────
 
 xgb_model = XGBClassifier(
     n_estimators=200,
     max_depth=6,
-    learning_rate=0.1,       # How much each tree contributes
-    subsample=0.8,           # Use 80% of data per tree (reduces overfitting)
-    colsample_bytree=0.8,   # Use 80% of features per tree
+    learning_rate=0.1,
+    subsample=0.8,
+    colsample_bytree=0.8,
     random_state=42,
     eval_metric='mlogloss',  # Multiclass log loss
     use_label_encoder=False,

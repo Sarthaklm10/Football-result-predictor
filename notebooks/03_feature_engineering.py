@@ -1,28 +1,7 @@
 """
-===============================================================
-STEP 6: Feature Engineering
-===============================================================
-International Football Match Outcome Predictor
-
-THE most important step. Raw columns like 'home_team' don't
-help a model predict outcomes. But 'home_team_win_rate_last10'
-tells the model HOW GOOD a team has been recently.
-
-GOLDEN RULE: Every feature is computed using ONLY past matches.
-             Never peek into the future. This prevents data leakage.
-
-Features we create:
-  For each team (home and away):
-    - Win/Draw/Loss rate (last 5, last 10 matches)
-    - Avg goals scored (last 5, last 10)
-    - Avg goals conceded (last 5, last 10)
-    - Goal difference (last 5, last 10)
-    - Days since last match
-  Match-level:
-    - Head-to-head win rate
-    - Tournament importance weight
-    - Neutral venue flag (already exists)
-===============================================================
+Step 6: Feature Engineering
+Builds rolling stats, head-to-head, tournament importance features.
+All features computed using only past matches (no leakage).
 """
 
 import pandas as pd
@@ -40,23 +19,7 @@ FEATURES_PATH = PROJECT_ROOT / 'data' / 'processed' / 'featured_matches.csv'
 # ══════════════════════════════════════════════════════════════
 
 def build_team_history(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert match data into a team-centric view.
-
-    Problem: In each row, a team can be 'home_team' OR 'away_team'.
-    Brazil might be home in row 5 and away in row 12. To compute
-    'Brazil's last 5 games', we need ALL of Brazil's matches in
-    one view.
-
-    Solution: Create two copies of each match — one from each
-    team's perspective — then combine them.
-
-    Example:
-      Original row:  Brazil 3 - 1 Argentina  (Home Win)
-
-      Becomes two rows:
-        team=Brazil,    goals_for=3, goals_against=1, win=1, is_home=1
-        team=Argentina, goals_for=1, goals_against=3, win=0, is_home=0
-    """
+    """Convert match rows into team-centric view (2 rows per match, one per team)."""
     # Home team perspective
     home = df[['date', 'home_team', 'home_score', 'away_score',
                'tournament', 'neutral', 'result']].copy()
@@ -90,20 +53,8 @@ def build_team_history(df: pd.DataFrame) -> pd.DataFrame:
 # ══════════════════════════════════════════════════════════════
 
 def compute_rolling_stats(team_history: pd.DataFrame, window: int) -> pd.DataFrame:
-    """Compute rolling statistics per team using a given window.
-
-    CRITICAL: We use .shift(1) before rolling. This ensures we
-    only use PAST matches, never the current match.
-
-    Without shift:  rolling includes the current match = DATA LEAKAGE
-    With shift(1):  rolling uses only previous matches = SAFE
-
-    Example (window=3, for Brazil):
-      Match 1: Win   → stats = NaN (not enough history)
-      Match 2: Loss  → stats = NaN (not enough history)
-      Match 3: Win   → stats = NaN (not enough history)
-      Match 4: Draw  → stats based on matches 1,2,3 ← SAFE
-      Match 5: Win   → stats based on matches 2,3,4 ← SAFE
+    """Compute rolling win/draw/loss rates and goal stats per team.
+    Uses shift(1) to exclude the current match from its own features.
     """
     suffix = f'_last{window}'
     grouped = team_history.groupby('team')
@@ -143,15 +94,7 @@ def compute_rolling_stats(team_history: pd.DataFrame, window: int) -> pd.DataFra
 # ══════════════════════════════════════════════════════════════
 
 def compute_days_since_last(team_history: pd.DataFrame) -> pd.Series:
-    """Calculate days since a team's previous match.
-
-    Intuition: A team that played 3 days ago might be tired.
-    A team that hasn't played in 60 days might be rusty.
-    Both extremes can affect performance.
-
-    We use .shift(1) to get the PREVIOUS match date, then
-    subtract from current date.
-    """
+    """Days since each team's previous match (captures fatigue/rustiness)."""
     prev_date = team_history.groupby('team')['date'].shift(1)
     days_since = (team_history['date'] - prev_date).dt.days
     return days_since
@@ -162,17 +105,7 @@ def compute_days_since_last(team_history: pd.DataFrame) -> pd.Series:
 # ══════════════════════════════════════════════════════════════
 
 def compute_head_to_head(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute historical head-to-head win rate between two teams.
-
-    For each match, we look at ALL previous meetings between
-    home_team and away_team, and compute:
-      - h2h_home_win_rate: how often the home team won in past meetings
-      - h2h_total_matches: how many times they've played before
-
-    This captures rivalries and historical dominance.
-    Example: Brazil vs Argentina have played 100+ times.
-    If Brazil won 60% historically, that's a strong signal.
-    """
+    """Compute historical head-to-head win rate between each pair of teams."""
     h2h_home_wr = []
     h2h_matches = []
 
@@ -211,18 +144,7 @@ def compute_head_to_head(df: pd.DataFrame) -> pd.DataFrame:
 # ══════════════════════════════════════════════════════════════
 
 def compute_tournament_importance(df: pd.DataFrame) -> pd.Series:
-    """Assign an importance weight to each tournament.
-
-    Intuition: Teams try harder in World Cup than in friendlies.
-    A World Cup match is more predictive of true team strength
-    than a friendly where squads are rotated.
-
-    We group ~200 tournament names into 4 tiers:
-      Tier 1 (weight 1.0): Major tournaments (World Cup, Euros, etc.)
-      Tier 2 (weight 0.7): Qualification matches
-      Tier 3 (weight 0.5): Regional/minor tournaments
-      Tier 4 (weight 0.3): Friendlies
-    """
+    """Map tournaments to importance weights (1.0=major, 0.7=qualifier, 0.5=regional, 0.3=friendly)."""
     def classify(tournament: str) -> float:
         t = tournament.lower()
         # Tier 1: Major finals
@@ -249,14 +171,7 @@ def compute_tournament_importance(df: pd.DataFrame) -> pd.Series:
 # ══════════════════════════════════════════════════════════════
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Build the complete feature matrix.
-
-    Steps:
-    1. Build team-centric view (each match -> 2 rows, one per team)
-    2. Compute rolling stats (last 5, last 10) for each team
-    3. Map these stats back to the original match rows
-    4. Add head-to-head, tournament importance, days since last
-    """
+    """Build the complete feature matrix from cleaned match data."""
     print("Building team history...")
     team_hist = build_team_history(df)
     print(f"  Team-centric rows: {len(team_hist):,} (2x matches)")
@@ -316,14 +231,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def drop_rows_without_history(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove rows where teams don't have enough history.
-
-    Teams' first few matches have NaN features because there's
-    no prior history to compute rolling stats from. We drop these.
-
-    We require at least 1 past match (min_periods=1 in rolling),
-    so mainly the very first match of each team will have NaN.
-    """
+    """Remove rows where teams lack enough match history for features."""
     before = len(df)
     # Only drop rows where ALL rolling features are NaN (team's first match)
     feature_cols = [c for c in df.columns if 'last5' in c or 'last10' in c]

@@ -1,20 +1,6 @@
 """
-===============================================================
-STEP 5: Data Cleaning
-===============================================================
-International Football Match Outcome Predictor
-
-This script cleans the raw dataset and prepares it for
-feature engineering. Cleaned data is saved to data/processed/.
-
-What we do:
-  1. Handle missing values (drop — only 5 rows affected)
-  2. Fix data types (date to datetime, scores to int)
-  3. Remove invalid/incomplete rows
-  4. Create the target variable
-  5. Drop columns not needed for modeling
-  6. Save cleaned dataset
-===============================================================
+Step 5: Data Cleaning
+Cleans the raw dataset and saves processed output to data/processed/.
 """
 
 # ── Imports ──────────────────────────────────────────────────
@@ -31,12 +17,7 @@ SAVE_PATH = PROCESSED_DIR / 'cleaned_matches.csv'
 
 
 def load_raw_data(filepath: Path) -> pd.DataFrame:
-    """Load raw CSV and return a DataFrame.
-    
-    We use parse_dates=['date'] to tell Pandas to automatically
-    convert the 'date' column from string to datetime during loading.
-    This is cleaner than converting it afterwards.
-    """
+    """Load raw CSV with date parsing."""
     df = pd.read_csv(filepath, parse_dates=['date'])
     print(f"Loaded {len(df):,} rows, {df.shape[1]} columns")
     print(f"Date range: {df['date'].min().date()} to {df['date'].max().date()}")
@@ -44,22 +25,7 @@ def load_raw_data(filepath: Path) -> pd.DataFrame:
 
 
 def check_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    """Inspect and report missing values.
-    
-    Intuition: Missing values are like holes in your data.
-    Before filling or dropping them, you need to understand
-    WHY they're missing — is it random, or systematic?
-    
-    Three strategies for handling missing values:
-      1. DROP the rows    — when very few rows are affected (<1%)
-      2. FILL with a value — when you can make a reasonable guess
-         (mean, median, mode, or a domain-specific default)
-      3. IMPUTE using ML   — when missingness is complex (overkill here)
-    
-    Our case: Only 5 rows out of 49,509 have missing values.
-    That's 0.01%. Dropping is the clear choice — we lose
-    almost nothing.
-    """
+    """Log missing values per column."""
     null_counts = df.isnull().sum()
     null_pct = (null_counts / len(df) * 100).round(4)
     
@@ -78,16 +44,7 @@ def check_missing_values(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop rows with any missing values.
-    
-    We use dropna() which removes any row that has at least one NaN.
-    
-    Why drop instead of fill?
-    - Only 5 rows are affected (0.01% of data)
-    - We can't guess what the missing team name or score was
-    - Filling scores with mean/median would create fake data
-    - Losing 5 rows out of 49,509 has zero impact on our model
-    """
+    """Drop rows with NaN values. Safe here since only ~5 rows are affected."""
     before = len(df)
     df = df.dropna()
     after = len(df)
@@ -99,21 +56,7 @@ def handle_missing_values(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fix_data_types(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert columns to their correct data types.
-    
-    Why fix types?
-    - home_score/away_score are float64 (because of NaN values).
-      Now that NaNs are gone, we can safely convert to int.
-      Goals are always whole numbers (you can't score 2.5 goals!)
-    
-    - date is already datetime (we used parse_dates in read_csv)
-    
-    - neutral is already boolean — correct
-    
-    Common mistake: Trying to convert to int BEFORE dropping NaNs.
-    NaN can only exist in float columns, so int conversion would
-    crash if NaNs remain.
-    """
+    """Convert score columns from float to int (safe after dropna)."""
     df['home_score'] = df['home_score'].astype(int)
     df['away_score'] = df['away_score'].astype(int)
     
@@ -126,17 +69,7 @@ def fix_data_types(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def check_duplicates(df: pd.DataFrame) -> pd.DataFrame:
-    """Check for and report duplicate rows.
-    
-    Why check duplicates?
-    - Duplicates inflate certain teams' statistics
-    - They bias the model by overrepresenting certain matches
-    - Real-world data often has accidental duplicates from
-      multiple data sources being merged
-    
-    We check exact duplicates (all columns match) AND
-    logical duplicates (same date + same teams).
-    """
+    """Check for exact and logical duplicates (same date + same teams)."""
     # Exact duplicates
     exact_dupes = df.duplicated().sum()
     print(f"\n--- Duplicate Check ---")
@@ -163,22 +96,7 @@ def check_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def create_target_variable(df: pd.DataFrame) -> pd.DataFrame:
-    """Create the target column: Home Win / Draw / Away Win.
-    
-    This is what we're trying to PREDICT. It's the 'y' in
-    our ML equation: y = f(X).
-    
-    We use np.where() instead of a for loop because:
-    - np.where processes the ENTIRE column at once in C
-    - A for loop processes one row at a time in Python
-    - On 49K rows, np.where is ~50x faster
-    
-    IMPORTANT: After creating the target, we DROP home_score
-    and away_score as features. Using them directly would be
-    DATA LEAKAGE — the model would just learn
-    "if home_score > away_score -> Home Win" (100% accuracy
-    in training, useless in real life).
-    """
+    """Derive target column (Home Win / Draw / Away Win) from scores."""
     df['result'] = np.where(
         df['home_score'] > df['away_score'], 'Home Win',
         np.where(df['away_score'] > df['home_score'], 'Away Win', 'Draw')
@@ -195,33 +113,7 @@ def create_target_variable(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def drop_unnecessary_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove columns that won't be used in modeling.
-    
-    Columns we DROP and why:
-    
-    - city: Too many unique values (2,089). High cardinality
-      categorical features create sparse, noisy encodings.
-      The information is partially captured by 'country' already.
-    
-    - country: Highly correlated with home_team (if Brazil plays
-      at home, country is almost always Brazil). Keeping both
-      adds redundancy without new information.
-    
-    Columns we KEEP:
-    - date:       Needed for chronological splitting + feature engineering
-    - home_team:  Core input
-    - away_team:  Core input
-    - home_score: Needed for feature engineering (historical stats)
-    - away_score: Needed for feature engineering (historical stats)
-    - tournament: Match importance indicator
-    - neutral:    Home advantage modifier
-    - result:     Target variable
-    
-    NOTE: home_score and away_score are kept at this stage
-    because we need them for feature engineering (computing
-    rolling averages, historical stats). They will NOT be
-    passed as features to the model — that happens in Step 8.
-    """
+    """Drop city and country — high cardinality and redundant with other columns."""
     cols_to_drop = ['city', 'country']
     df = df.drop(columns=cols_to_drop)
     
@@ -232,15 +124,7 @@ def drop_unnecessary_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def sort_by_date(df: pd.DataFrame) -> pd.DataFrame:
-    """Sort the entire dataset chronologically.
-    
-    Why? Feature engineering in Step 6 computes rolling
-    statistics like 'last 5 games.' If data isn't sorted
-    by date, 'last 5 games' would be meaningless.
-    
-    Also, chronological order is required for our train/test
-    split — we train on the past and test on the future.
-    """
+    """Sort matches by date for chronological feature engineering."""
     df = df.sort_values('date').reset_index(drop=True)
     print(f"\n--- Sorted by Date ---")
     print(f"  First match: {df['date'].iloc[0].date()}")
@@ -249,11 +133,7 @@ def sort_by_date(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_cleaned_data(df: pd.DataFrame, filepath: Path) -> None:
-    """Save the cleaned DataFrame to CSV.
-    
-    index=False prevents Pandas from saving the row numbers
-    as an extra column (a common beginner mistake).
-    """
+    """Save cleaned DataFrame to CSV."""
     df.to_csv(filepath, index=False)
     size_mb = filepath.stat().st_size / 1e6
     print(f"\n--- Saved ---")
@@ -265,11 +145,7 @@ def save_cleaned_data(df: pd.DataFrame, filepath: Path) -> None:
 
 # ── Main Pipeline ────────────────────────────────────────────
 def main():
-    """Run the complete data cleaning pipeline.
-    
-    Each function does ONE thing (Single Responsibility Principle).
-    This makes the code easy to read, test, and debug.
-    """
+    """Run the full data cleaning pipeline."""
     print("=" * 60)
     print("STEP 5: Data Cleaning Pipeline")
     print("=" * 60)

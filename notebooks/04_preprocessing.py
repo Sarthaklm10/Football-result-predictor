@@ -1,23 +1,7 @@
 """
-===============================================================
-STEPS 7 & 8: Target Variable & Preprocessing
-===============================================================
-International Football Match Outcome Predictor
-
-Step 7: Target variable is already created ('result' column).
-        This script formalizes it with label encoding.
-
-Step 8: Preprocessing pipeline:
-  1. Select features (drop raw columns the model shouldn't see)
-  2. Chronological train/test split
-  3. Feature scaling (StandardScaler)
-  4. Save processed X_train, X_test, y_train, y_test
-
-WHY chronological split instead of random?
-  - Sports data is time-dependent
-  - Random split leaks future information into training
-  - We train on past, test on future = realistic simulation
-===============================================================
+Steps 7 & 8: Target Encoding & Preprocessing
+Label encodes the target, selects features, does chronological
+train/test split, and scales features with StandardScaler.
 """
 
 import pandas as pd
@@ -40,22 +24,7 @@ MODELS_DIR.mkdir(exist_ok=True)
 # ══════════════════════════════════════════════════════════════
 
 def encode_target(y: pd.Series) -> tuple:
-    """Encode string labels to integers using LabelEncoder.
-
-    ML algorithms need numbers, not strings.
-    LabelEncoder converts:
-        'Away Win' -> 0
-        'Draw'     -> 1
-        'Home Win' -> 2
-
-    We also save the encoder so we can convert predictions
-    BACK to human-readable labels later.
-
-    Why LabelEncoder and not One-Hot for the target?
-      - One-Hot is for INPUT features (creates separate columns)
-      - For the TARGET, algorithms expect a single column of integers
-      - Multiclass classifiers internally handle the rest
-    """
+    """Encode string labels (Away Win, Draw, Home Win) to integers."""
     le = LabelEncoder()
     y_encoded = le.fit_transform(y)
     print("--- Step 7: Target Encoding ---")
@@ -73,26 +42,7 @@ def encode_target(y: pd.Series) -> tuple:
 # ══════════════════════════════════════════════════════════════
 
 def select_features(df: pd.DataFrame) -> tuple:
-    """Separate features (X) from target (y).
-
-    Columns we DROP from X:
-      - date:       Not a feature (used for splitting only)
-      - home_team:  Already captured by rolling stats
-      - away_team:  Already captured by rolling stats
-      - home_score: DATA LEAKAGE (contains the answer)
-      - away_score: DATA LEAKAGE (contains the answer)
-      - tournament: Replaced by tournament_importance
-      - result:     This IS the target variable (y)
-
-    What remains as features (X):
-      - 26 rolling stats (win rate, goals, goal diff for both teams)
-      - 2 days_since_last (home + away)
-      - tournament_importance
-      - neutral
-      - h2h_home_win_rate
-      - h2h_total_matches
-      = 30 features total
-    """
+    """Separate features (X) from target (y), dropping raw/leaky columns."""
     cols_to_drop = ['date', 'home_team', 'away_team',
                     'home_score', 'away_score', 'tournament', 'result']
 
@@ -109,18 +59,7 @@ def select_features(df: pd.DataFrame) -> tuple:
 
 def chronological_split(X: pd.DataFrame, y: np.ndarray,
                         dates: pd.Series, test_ratio: float = 0.2) -> tuple:
-    """Split data chronologically: train on past, test on future.
-
-    WHY NOT random split?
-      Random: Model trains on 2024 data, tested on 2015 data.
-              It already "knows" how teams evolved. Unfair.
-
-      Chronological: Model trains on pre-2020 data, tested on 2020+.
-                     It must predict the future from the past. Fair.
-
-    We use the last 20% of matches (by date) as the test set.
-    This is approximately matches from 2018-2019 onwards.
-    """
+    """Split data by date: train on past, test on future (last 20%)."""
     split_idx = int(len(X) * (1 - test_ratio))
     split_date = dates.iloc[split_idx]
 
@@ -154,27 +93,7 @@ def chronological_split(X: pd.DataFrame, y: np.ndarray,
 
 
 def scale_features(X_train: pd.DataFrame, X_test: pd.DataFrame) -> tuple:
-    """Standardize features to have mean=0 and std=1.
-
-    WHY scale?
-      - 'days_since_last' ranges from 0 to 5000+
-      - 'win_rate_last5' ranges from 0 to 1
-      - Without scaling, the model thinks 'days_since_last'
-        is more important just because it has bigger numbers
-
-    StandardScaler transforms each feature:
-      scaled_value = (value - mean) / std_deviation
-
-    CRITICAL: We fit the scaler on TRAINING data only, then
-    apply it to BOTH train and test. Why?
-      - If we fit on test data too, test statistics leak into
-        the transformation = subtle data leakage
-      - In production, you only have training data when building
-        the model
-
-    Common mistake: Fitting scaler on ALL data before splitting.
-    This leaks test set statistics into training.
-    """
+    """Standardize features (mean=0, std=1). Fit on train only to avoid leakage."""
     scaler = StandardScaler()
 
     # Fit on train ONLY, transform both
