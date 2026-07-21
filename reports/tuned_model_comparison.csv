@@ -1,0 +1,4 @@
+model,accuracy,f1_macro
+Random Forest (tuned),0.5016,0.4679
+XGBoost (tuned),0.493,0.4003
+Logistic Regression (baseline),0.51,0.4491

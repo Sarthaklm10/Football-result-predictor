@@ -1,8 +1,5 @@
 # ⚽ International Football Match Outcome Predictor
-
-![Status](https://img.shields.io/badge/Status-In%20Development-yellow)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
 
 ## 📌 Objective
 
@@ -73,19 +70,3 @@ venv\Scripts\activate        # Windows
 # Install dependencies
 pip install -r requirements.txt
 ```
-
-## 📈 Results
-
-> *Model performance metrics will be added after training is complete.*
-
-## 📸 Screenshots
-
-> *Application screenshots will be added after the Streamlit app is built.*
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 👤 Author
-
-Built as a learning project following an industry-standard ML development workflow.
