@@ -1,6 +1,6 @@
 """
 Step 6: Feature Engineering
-Builds rolling stats, head-to-head, tournament importance features.
+Builds ELO ratings, rolling stats, head-to-head, tournament importance.
 All features computed using only past matches (no leakage).
 """
 
@@ -143,27 +143,106 @@ def compute_head_to_head(df: pd.DataFrame) -> pd.DataFrame:
 # FEATURE: Tournament Importance
 # ══════════════════════════════════════════════════════════════
 
+def get_tournament_k_factor(tournament: str) -> float:
+    """Return K-factor for ELO update based on tournament type."""
+    t = tournament.lower()
+    if any(kw in t for kw in ['fifa world cup', 'uefa euro',
+           'copa am', 'african cup of nations',
+           'afc asian cup', 'concacaf gold cup',
+           'confederations cup', 'nations league']):
+        if 'qualification' not in t:
+            return 60    # Major tournament finals
+    if 'qualification' in t or 'qualifying' in t:
+        return 40        # Qualifiers
+    if 'friendly' not in t:
+        return 30        # Regional / minor tournaments
+    return 20            # Friendlies
+
+
 def compute_tournament_importance(df: pd.DataFrame) -> pd.Series:
     """Map tournaments to importance weights (1.0=major, 0.7=qualifier, 0.5=regional, 0.3=friendly)."""
     def classify(tournament: str) -> float:
         t = tournament.lower()
-        # Tier 1: Major finals
         if any(kw in t for kw in ['fifa world cup', 'uefa euro',
                'copa am', 'african cup of nations',
                'afc asian cup', 'concacaf gold cup',
                'confederations cup', 'nations league']):
             if 'qualification' not in t:
                 return 1.0
-        # Tier 2: Qualifiers
         if 'qualification' in t or 'qualifying' in t:
             return 0.7
-        # Tier 3: Other named tournaments
         if 'friendly' not in t:
             return 0.5
-        # Tier 4: Friendlies
         return 0.3
 
     return df['tournament'].apply(classify)
+
+
+# ══════════════════════════════════════════════════════════════
+# FEATURE: ELO Ratings
+# ══════════════════════════════════════════════════════════════
+
+def compute_elo_ratings(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute ELO ratings for each team, processed chronologically.
+    Stores the PRE-MATCH rating as the feature (no leakage).
+    Uses variable K-factor by tournament and goal-diff multiplier.
+    """
+    elo = {}  # team_name -> current rating
+    DEFAULT_ELO = 1500
+
+    home_elos = []
+    away_elos = []
+
+    for _, row in df.iterrows():
+        ht = row['home_team']
+        at = row['away_team']
+
+        # Get current ratings (default 1500 for new teams)
+        r_home = elo.get(ht, DEFAULT_ELO)
+        r_away = elo.get(at, DEFAULT_ELO)
+
+        # Store PRE-MATCH ratings as features
+        home_elos.append(r_home)
+        away_elos.append(r_away)
+
+        # Expected scores
+        e_home = 1.0 / (1.0 + 10 ** ((r_away - r_home) / 400.0))
+        e_away = 1.0 - e_home
+
+        # Actual scores
+        if row['result'] == 'Home Win':
+            s_home, s_away = 1.0, 0.0
+        elif row['result'] == 'Away Win':
+            s_home, s_away = 0.0, 1.0
+        else:
+            s_home, s_away = 0.5, 0.5
+
+        # K-factor varies by tournament importance
+        K = get_tournament_k_factor(row['tournament'])
+
+        # Goal difference multiplier: blowouts update more
+        goal_diff = abs(row['home_score'] - row['away_score'])
+        gd_mult = np.log(1 + goal_diff) if goal_diff > 0 else 1.0
+
+        K_eff = K * gd_mult
+
+        # Update ratings
+        elo[ht] = r_home + K_eff * (s_home - e_home)
+        elo[at] = r_away + K_eff * (s_away - e_away)
+
+    result = pd.DataFrame({
+        'home_elo': home_elos,
+        'away_elo': away_elos,
+        'elo_diff': [h - a for h, a in zip(home_elos, away_elos)]
+    }, index=df.index)
+
+    # Print some stats
+    top_teams = sorted(elo.items(), key=lambda x: x[1], reverse=True)[:10]
+    print("  Top 10 ELO ratings (final):")
+    for team, rating in top_teams:
+        print(f"    {team:<25} {rating:.0f}")
+
+    return result
 
 
 # ══════════════════════════════════════════════════════════════
@@ -172,6 +251,12 @@ def compute_tournament_importance(df: pd.DataFrame) -> pd.Series:
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Build the complete feature matrix from cleaned match data."""
+
+    # --- ELO ratings (must be first — processes chronologically) ---
+    print("Computing ELO ratings...")
+    elo_features = compute_elo_ratings(df)
+    df = pd.concat([df.reset_index(drop=True), elo_features], axis=1)
+
     print("Building team history...")
     team_hist = build_team_history(df)
     print(f"  Team-centric rows: {len(team_hist):,} (2x matches)")

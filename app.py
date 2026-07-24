@@ -105,6 +105,29 @@ def get_tournament_importance(tournament_type):
     return mapping.get(tournament_type, 0.5)
 
 
+def get_team_elo(df, team):
+    """Get the latest ELO rating for a team from featured data."""
+    # Check if team played as home
+    home_matches = df[df['home_team'] == team]
+    away_matches = df[df['away_team'] == team]
+
+    latest_elo = 1500  # default
+
+    candidates = []
+    if not home_matches.empty:
+        row = home_matches.iloc[-1]
+        candidates.append((row['date'], row.get('home_elo', 1500)))
+    if not away_matches.empty:
+        row = away_matches.iloc[-1]
+        candidates.append((row['date'], row.get('away_elo', 1500)))
+
+    if candidates:
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        latest_elo = candidates[0][1]
+
+    return latest_elo
+
+
 # ══════════════════════════════════════════════════════════════
 # APP LAYOUT
 # ══════════════════════════════════════════════════════════════
@@ -201,6 +224,13 @@ else:
             features.update(away_stats)
             features.update(h2h)
 
+            # ELO features
+            home_elo = get_team_elo(df, home_team)
+            away_elo = get_team_elo(df, away_team)
+            features['home_elo'] = home_elo
+            features['away_elo'] = away_elo
+            features['elo_diff'] = home_elo - away_elo
+
             # Create DataFrame in correct column order
             X = pd.DataFrame([features])[feature_names]
 
@@ -258,7 +288,7 @@ else:
 st.markdown("---")
 st.markdown(
     "<p style='text-align:center; color:gray; font-size:0.85rem;'>"
-    "Built with Streamlit • Model: Random Forest (tuned) • F1 Score: 0.4679"
+    "Built with Streamlit • Model: Random Forest (tuned) • F1 Score: 0.5272"
     "</p>",
     unsafe_allow_html=True
 )
