@@ -29,6 +29,7 @@ desktop.ini
 
 # Data (processed only — raw CSVs are small enough to track)
 data/processed/*.csv
+!data/processed/featured_matches.csv
 
 # Trained Models (large binary files)
 models/*.joblib
