@@ -33,6 +33,11 @@ data/processed/*.csv
 # Trained Models (large binary files)
 models/*.joblib
 models/*.pkl
+# Allow Streamlit app dependencies
+!models/best_model.joblib
+!models/scaler.joblib
+!models/label_encoder.joblib
+!models/feature_names.joblib
 
 # Reports (generated outputs)
 reports/*.html

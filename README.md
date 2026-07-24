@@ -90,10 +90,10 @@ streamlit run app.py
 
 | Model | Accuracy | F1 (macro) |
 |-------|----------|------------|
-| Logistic Regression | 51.00% | 0.4491 |
-| Random Forest | 50.50% | 0.4613 |
-| **Random Forest (tuned)** | **50.16%** | **0.4679** |
-| XGBoost | 52.98% | 0.3897 |
-| XGBoost (tuned) | 49.30% | 0.4003 |
+| Logistic Regression | 57.38% | 0.5215 |
+| Random Forest | 57.32% | 0.5179 |
+| **Random Forest (tuned)** | **56.97%** | **0.5272** |
+| XGBoost | 59.26% | 0.4541 |
+| XGBoost (tuned) | 57.63% | 0.4669 |
 
 Best model: **Random Forest (tuned)** — selected on F1-macro to balance all 3 classes.
